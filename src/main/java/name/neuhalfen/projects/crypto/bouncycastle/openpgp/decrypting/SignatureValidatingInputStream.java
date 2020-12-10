@@ -85,11 +85,6 @@ final class SignatureValidatingInputStream extends FilterInputStream {
 
   }
 
-  @Override
-  public long skip(long n) throws IOException {
-    throw new UnsupportedOperationException("Skipping not supported");
-  }
-
   @SuppressWarnings("PMD.AvoidSynchronizedAtMethodLevel")
   @Override
   public synchronized void mark(int readlimit) {

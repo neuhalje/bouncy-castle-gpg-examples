@@ -3,6 +3,7 @@ package name.neuhalfen.projects.crypto.bouncycastle.openpgp.roundtrip;
 
 import static name.neuhalfen.projects.crypto.bouncycastle.openpgp.testtooling.ExampleMessages.FULL_USER_ID_SENDER;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertSame;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -89,6 +90,44 @@ public class EncryptionDecryptionRoundtripIntegrationTest {
     final byte[] decryptedPlaintext = Streams.readAll(decryptedPlaintextStream);
 
     assertArrayEquals(expectedPlaintext, decryptedPlaintext);
+  }
+
+  @Test
+  public void encryptAndSignArmored_thenDecryptAndVerifyWithSkip_yieldsOriginalPlaintext()
+          throws IOException, PGPException, NoSuchAlgorithmException, NoSuchProviderException, SignatureException {
+    final byte[] expectedPlaintext = ExampleMessages.IMPORTANT_QUOTE_TEXT.getBytes(
+            "US-ASCII");
+
+    ByteArrayOutputStream cipherText = new ByteArrayOutputStream();
+
+    final OutputStream encryptionStream = BouncyGPG
+            .encryptToStream()
+            .withConfig(Configs.keyringConfigFromFilesForSender())
+            .withAlgorithms(algorithmSuite)
+            .toRecipient("recipient@example.com")
+            .andSignWith("sender@example.com")
+            .armorAsciiOutput()
+            .andWriteTo(cipherText);
+
+    encryptionStream.write(expectedPlaintext);
+    encryptionStream.close();
+    cipherText.close();
+
+    ByteArrayInputStream cipherTextAsSource = new ByteArrayInputStream(cipherText.toByteArray());
+
+    // Decrypt
+    final InputStream decryptedPlaintextStream = BouncyGPG
+            .decryptAndVerifyStream()
+            .withConfig(Configs.keyringConfigFromResourceForRecipient())
+            .andRequireSignatureFromAllKeys("sender@example.com")
+            .fromEncryptedInputStream(cipherTextAsSource);
+
+    // Skip 5 bytes of plaintext
+    decryptedPlaintextStream.skip(5);
+
+    final byte[] decryptedPlaintext = Streams.readAll(decryptedPlaintextStream);
+    // And expect the rest of the plaintext to be identical to the input with the first 5 chars (==bytes in this case) skipped
+    assertSame(new String(decryptedPlaintext, "US-ASCII"), ExampleMessages.IMPORTANT_QUOTE_TEXT.substring(5));
   }
 
 
