@@ -91,7 +91,7 @@ final class EncryptWithOpenPGPTestDriver {
 
     try (final OutputStream encryptionStream = PGPEncryptingStream
         .create(config, algorithmSuite, signatureUid, out, keySelectionStrategy, armor,
-            pubEncKeys)) {
+            pubEncKeys, false)) {
       Streams.pipeAll(in, encryptionStream);
       encryptionStream.flush();
     }

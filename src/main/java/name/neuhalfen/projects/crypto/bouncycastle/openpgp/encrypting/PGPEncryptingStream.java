@@ -78,6 +78,7 @@ public final class PGPEncryptingStream extends OutputStream {
    * @param keySelectionStrategy selection strategy
    * @param armor armor the file (true) or use binary.
    * @param encryptTo encrypt to
+   * @param textMode simulates GnuPG's {@code --textmode} flag
    *
    * @return stream where plaintext gets written into
    *
@@ -93,7 +94,8 @@ public final class PGPEncryptingStream extends OutputStream {
       final OutputStream cipherTextSink,
       final KeySelectionStrategy keySelectionStrategy,
       final boolean armor,
-      final Set<PGPPublicKey> encryptTo)
+      final Set<PGPPublicKey> encryptTo,
+      final boolean textMode)
       throws IOException, PGPException, NoSuchAlgorithmException, NoSuchProviderException {
 
     requireNonNull(config, "callback must not be null");
@@ -109,7 +111,7 @@ public final class PGPEncryptingStream extends OutputStream {
     }
 
     final PGPEncryptingStream encryptingStream = new PGPEncryptingStream(config, algorithmSuite);
-    encryptingStream.setup(cipherTextSink, signingUid, encryptTo, keySelectionStrategy, armor);
+    encryptingStream.setup(cipherTextSink, signingUid, encryptTo, keySelectionStrategy, armor, textMode);
     return encryptingStream;
   }
 
@@ -122,6 +124,7 @@ public final class PGPEncryptingStream extends OutputStream {
    * @param pubEncKeys the pub enc keys
    * @param keySelectionStrategy key selection strategy (for signatures)
    * @param armor if OutputStream should be "armored", that means base64 encoded
+   * @param textMode simulates GnuPG's {@code --textmode} flag
    *
    * @throws IOException Signals that an I/O exception has occurred.
    * @throws PGPException the pGP exception
@@ -134,7 +137,8 @@ public final class PGPEncryptingStream extends OutputStream {
       @Nullable final String signingUid,
       final Set<PGPPublicKey> pubEncKeys,
       final KeySelectionStrategy keySelectionStrategy,
-      final boolean armor) throws
+      final boolean armor,
+      final boolean textMode) throws
       IOException, PGPException {
     isDoSign = signingUid != null;
 
@@ -186,7 +190,7 @@ public final class PGPEncryptingStream extends OutputStream {
           new BcPGPContentSignerBuilder(pgpSec.getPublicKey().getAlgorithm(),
               algorithmSuite.getHashAlgorithmCode().getAlgorithmId()));
 
-      signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
+      signatureGenerator.init(textMode ? PGPSignature.CANONICAL_TEXT_DOCUMENT : PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
 
       final Iterator<?> userIDs = pgpSec.getPublicKey().getUserIDs();
       if (userIDs.hasNext()) {
@@ -208,7 +212,7 @@ public final class PGPEncryptingStream extends OutputStream {
 
     encryptionDataStreamGenerator = new PGPLiteralDataGenerator();
     encryptionDataStream = encryptionDataStreamGenerator
-        .open(compressionStream, PGPLiteralData.BINARY, "", new Date(), new byte[1 << 16]);
+        .open(compressionStream, textMode ? PGPLiteralData.TEXT : PGPLiteralData.BINARY, "", new Date(), new byte[1 << 16]);
   }
 
   @Override

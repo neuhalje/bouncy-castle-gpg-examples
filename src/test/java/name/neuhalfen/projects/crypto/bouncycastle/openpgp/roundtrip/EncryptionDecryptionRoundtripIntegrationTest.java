@@ -11,7 +11,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SignatureException;
@@ -107,6 +106,41 @@ public class EncryptionDecryptionRoundtripIntegrationTest {
         .toRecipient("recipient@example.com")
         .andSignWith("sender@example.com")
         .binaryOutput()
+        .andWriteTo(cipherText);
+
+    encryptionStream.write(expectedPlaintext);
+    encryptionStream.close();
+    cipherText.close();
+
+    ByteArrayInputStream cipherTextAsSource = new ByteArrayInputStream(cipherText.toByteArray());
+
+    // Decrypt
+    final InputStream decryptedPlaintextStream = BouncyGPG
+        .decryptAndVerifyStream()
+        .withConfig(Configs.keyringConfigFromResourceForRecipient())
+        .andRequireSignatureFromAllKeys("sender@example.com")
+        .fromEncryptedInputStream(cipherTextAsSource);
+
+    final byte[] decryptedPlaintext = Streams.readAll(decryptedPlaintextStream);
+
+    assertArrayEquals(expectedPlaintext, decryptedPlaintext);
+  }
+
+  @Test
+  public void encryptAndSignTextModeBinary_thenDecryptAndVerify_yieldsOriginalPlaintext()
+      throws IOException, PGPException, NoSuchAlgorithmException, NoSuchProviderException, SignatureException {
+    final byte[] expectedPlaintext = ExampleMessages.IMPORTANT_QUOTE_TEXT.getBytes("US-ASCII");
+
+    ByteArrayOutputStream cipherText = new ByteArrayOutputStream();
+
+    final OutputStream encryptionStream = BouncyGPG
+        .encryptToStream()
+        .withConfig(Configs.keyringConfigFromFilesForSender())
+        .withAlgorithms(algorithmSuite)
+        .toRecipient("recipient@example.com")
+        .andSignWith("sender@example.com")
+        .binaryOutput()
+        .textMode()
         .andWriteTo(cipherText);
 
     encryptionStream.write(expectedPlaintext);

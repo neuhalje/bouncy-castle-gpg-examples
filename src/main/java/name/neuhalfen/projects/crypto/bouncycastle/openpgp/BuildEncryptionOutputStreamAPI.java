@@ -51,6 +51,7 @@ public final class BuildEncryptionOutputStreamAPI {
   private String signWith;
   private Set<PGPPublicKey> recipients;
   private boolean armorOutput;
+  private boolean textMode;
 
   // Signature
 
@@ -97,6 +98,16 @@ public final class BuildEncryptionOutputStreamAPI {
 
     OutputStream andWriteTo(OutputStream sinkForEncryptedData)
         throws PGPException, SignatureException, NoSuchAlgorithmException, NoSuchProviderException, IOException;
+  }
+
+  public interface BuildWithTextMode extends Build {
+
+    /**
+     * Emulates GnuPG's {@code --textmode} flag, which encodes data as text literal
+     * packets rather than binary literal packets.
+     * @return next step
+     */
+    Build textMode();
   }
 
 
@@ -222,14 +233,14 @@ public final class BuildEncryptionOutputStreamAPI {
            *
            * @return next step
            */
-          Build binaryOutput();
+          BuildWithTextMode binaryOutput();
 
           /**
            * Ascii armor the output, e.g. for usage in text protocols.
            *
            * @return next step
            */
-          Build armorAsciiOutput();
+          BuildWithTextMode armorAsciiOutput();
         }
       }
     }
@@ -486,21 +497,21 @@ public final class BuildEncryptionOutputStreamAPI {
         public final class ArmorImpl implements Armor {
 
           @Override
-          public Build binaryOutput() {
+          public BuildWithTextMode binaryOutput() {
             BuildEncryptionOutputStreamAPI.this.armorOutput = false;
             LOGGER.trace("binary output");
-            return new Builder();
+            return new BuilderWithTextMode();
           }
 
           @Override
-          public Build armorAsciiOutput() {
+          public BuildWithTextMode armorAsciiOutput() {
             BuildEncryptionOutputStreamAPI.this.armorOutput = true;
             LOGGER.trace("ascii armor output");
-            return new Builder();
+            return new BuilderWithTextMode();
           }
 
 
-          public final class Builder implements Build {
+          public class Builder implements Build {
 
             @Override
             public OutputStream andWriteTo(OutputStream sinkForEncryptedData)
@@ -513,8 +524,19 @@ public final class BuildEncryptionOutputStreamAPI {
                   BuildEncryptionOutputStreamAPI.this.sinkForEncryptedData,
                   getKeySelectionStrategy(),
                   BuildEncryptionOutputStreamAPI.this.armorOutput,
-                  BuildEncryptionOutputStreamAPI.this.recipients);
+                  BuildEncryptionOutputStreamAPI.this.recipients,
+                  BuildEncryptionOutputStreamAPI.this.textMode);
 
+            }
+          }
+
+          public final class BuilderWithTextMode extends Builder implements BuildWithTextMode {
+
+            @Override
+            public Build textMode() {
+              BuildEncryptionOutputStreamAPI.this.textMode = true;
+              LOGGER.trace("text mode");
+              return this;
             }
           }
         }
